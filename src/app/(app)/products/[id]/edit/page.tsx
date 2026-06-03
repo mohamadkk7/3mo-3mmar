@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import ProductEditor from "../../ProductEditor";
+import { getProductById, listProductEditorData } from "@/lib/store";
 
 export default async function EditProductPage({
   params,
@@ -13,16 +13,9 @@ export default async function EditProductPage({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const [product, materials] = await Promise.all([
-    prisma.product.findFirst({
-      where: { id, userId: user.id },
-      include: { ingredients: true },
-    }),
-    prisma.material.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "asc" },
-      select: { id: true, name: true, unit: true, pricePerUnit: true },
-    }),
+  const [{ materials }, product] = await Promise.all([
+    listProductEditorData(),
+    getProductById(id),
   ]);
 
   if (!product) notFound();

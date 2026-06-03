@@ -1,20 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { costPerUnit, formatMoney, formatQty } from "@/lib/format";
+import { countMaterials, listProductsExpanded } from "@/lib/store";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
   const [materialsCount, products] = await Promise.all([
-    prisma.material.count({ where: { userId: user.id } }),
-    prisma.product.findMany({
-      where: { userId: user.id },
-      orderBy: { updatedAt: "desc" },
-      include: { ingredients: { include: { material: true } } },
-    }),
+    countMaterials(),
+    listProductsExpanded({ order: "updatedDesc" }),
   ]);
 
   return (

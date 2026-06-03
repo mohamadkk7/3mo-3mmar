@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import {
   costPerUnit,
@@ -9,6 +8,7 @@ import {
   totalCost,
   unitLabel,
 } from "@/lib/format";
+import { getProductExpandedById } from "@/lib/store";
 import DeleteProductButton from "./DeleteProductButton";
 
 export default async function ProductDetailPage({
@@ -20,12 +20,7 @@ export default async function ProductDetailPage({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const product = await prisma.product.findFirst({
-    where: { id, userId: user.id },
-    include: {
-      ingredients: { include: { material: true }, orderBy: { id: "asc" } },
-    },
-  });
+  const product = await getProductExpandedById(id);
   if (!product) notFound();
 
   const total = totalCost(product.ingredients);

@@ -1,22 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { costPerUnit, formatMoney, formatQty, totalCost } from "@/lib/format";
+import { countMaterials, listProductsExpanded } from "@/lib/store";
 
 export default async function ProductsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const products = await prisma.product.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "asc" },
-    include: { ingredients: { include: { material: true } } },
-  });
-
-  const materialsCount = await prisma.material.count({
-    where: { userId: user.id },
-  });
+  const [products, materialsCount] = await Promise.all([
+    listProductsExpanded({ order: "createdAsc" }),
+    countMaterials(),
+  ]);
 
   return (
     <div className="space-y-5">

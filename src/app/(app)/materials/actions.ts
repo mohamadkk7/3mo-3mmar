@@ -1,9 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { parseNumber } from "@/lib/format";
+import {
+  createMaterial as createStoredMaterial,
+  deleteMaterial as deleteStoredMaterial,
+  listMaterialsWithUsage,
+  updateMaterial as updateStoredMaterial,
+} from "@/lib/store";
 
 async function requireUser() {
   const user = await getCurrentUser();
@@ -14,7 +19,7 @@ async function requireUser() {
 export type ActionResult = { ok: boolean; error?: string };
 
 export async function createMaterial(formData: FormData): Promise<ActionResult> {
-  const user = await requireUser();
+  await requireUser();
 
   const name = String(formData.get("name") || "").trim();
   const unit = String(formData.get("unit") || "kg");
@@ -26,9 +31,7 @@ export async function createMaterial(formData: FormData): Promise<ActionResult> 
   if (!isFinite(price) || price < 0)
     return { ok: false, error: "السعر غير صالح." };
 
-  await prisma.material.create({
-    data: { userId: user.id, name, unit, pricePerUnit: price },
-  });
+  await createStoredMaterial({ name, unit, pricePerUnit: price });
 
   revalidatePath("/materials");
   revalidatePath("/products");
@@ -40,20 +43,12 @@ export async function updateMaterialPrice(
   id: string,
   price: number
 ): Promise<ActionResult> {
-  const user = await requireUser();
+  await requireUser();
   if (!isFinite(price) || price < 0)
     return { ok: false, error: "السعر غير صالح." };
 
-  const material = await prisma.material.findFirst({
-    where: { id, userId: user.id },
-    select: { id: true },
-  });
+  const material = await updateStoredMaterial(id, { pricePerUnit: price });
   if (!material) return { ok: false, error: "المادة غير موجودة." };
-
-  await prisma.material.update({
-    where: { id },
-    data: { pricePerUnit: price },
-  });
 
   revalidatePath("/materials");
   revalidatePath("/products");
@@ -65,15 +60,9 @@ export async function updateMaterial(
   id: string,
   data: { name?: string; unit?: string; price?: number }
 ): Promise<ActionResult> {
-  const user = await requireUser();
+  await requireUser();
 
-  const material = await prisma.material.findFirst({
-    where: { id, userId: user.id },
-    select: { id: true },
-  });
-  if (!material) return { ok: false, error: "المادة غير موجودة." };
-
-  const patch: { name?: string; unit?: string; pricePerUnit?: number } = {};
+  const patch: { name?: string; unit?: "kg" | "l"; pricePerUnit?: number } = {};
   if (data.name !== undefined) {
     const name = data.name.trim();
     if (!name) return { ok: false, error: "اسم المادة مطلوب." };
@@ -90,7 +79,8 @@ export async function updateMaterial(
     patch.pricePerUnit = data.price;
   }
 
-  await prisma.material.update({ where: { id }, data: patch });
+  const material = await updateStoredMaterial(id, patch);
+  if (!material) return { ok: false, error: "المادة غير موجودة." };
 
   revalidatePath("/materials");
   revalidatePath("/products");
@@ -99,20 +89,17 @@ export async function updateMaterial(
 }
 
 export async function deleteMaterial(id: string): Promise<ActionResult> {
-  const user = await requireUser();
+  await requireUser();
 
-  const material = await prisma.material.findFirst({
-    where: { id, userId: user.id },
-    select: { id: true, _count: { select: { ingredients: true } } },
-  });
+  const material = (await listMaterialsWithUsage()).find((item) => item.id === id);
   if (!material) return { ok: false, error: "المادة غير موجودة." };
-  if (material._count.ingredients > 0)
+  if (material.usedIn > 0)
     return {
       ok: false,
       error: "لا يمكن حذف مادة مستخدمة في منتجات. احذفها من المنتجات أولاً.",
     };
 
-  await prisma.material.delete({ where: { id } });
+  await deleteStoredMaterial(id);
 
   revalidatePath("/materials");
   revalidatePath("/products");

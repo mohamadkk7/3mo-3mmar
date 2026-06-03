@@ -1,18 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import ProductEditor from "../ProductEditor";
+import { listProductEditorData } from "@/lib/store";
 
 export default async function NewProductPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const materials = await prisma.material.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, unit: true, pricePerUnit: true },
-  });
+  const { materials } = await listProductEditorData();
 
   return (
     <div className="space-y-5">

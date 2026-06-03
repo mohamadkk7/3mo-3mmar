@@ -1,11 +1,10 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
-import bcrypt from "bcryptjs";
-import { prisma } from "./prisma";
 
 const COOKIE_NAME = "factory_session";
 const SESSION_DAYS = 30;
+const STATIC_USER_ID = "owner";
 
 function getSecretKey(): Uint8Array {
   const secret = process.env.AUTH_SECRET;
@@ -19,6 +18,13 @@ export type SessionPayload = {
   userId: string;
   email: string;
 };
+
+export function getConfiguredLogin() {
+  return {
+    email: (process.env.SEED_EMAIL || "test@test.com").trim().toLowerCase(),
+    password: process.env.SEED_PASSWORD || "test1234",
+  };
+}
 
 export async function createSession(payload: SessionPayload): Promise<void> {
   const token = await new SignJWT({ ...payload })
@@ -58,25 +64,24 @@ export async function getSession(): Promise<SessionPayload | null> {
   }
 }
 
-/** يرجع المستخدم الحالي أو null. يتحقق من وجوده في قاعدة البيانات. */
+/** يرجع المستخدم الحالي أو null. التطبيق يستخدم حساباً ثابتاً من البيئة. */
 export async function getCurrentUser() {
   const session = await getSession();
   if (!session) return null;
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { id: true, email: true },
-  });
-  return user;
+  const configured = getConfiguredLogin();
+  if (
+    session.userId !== STATIC_USER_ID ||
+    session.email.toLowerCase() !== configured.email
+  ) {
+    return null;
+  }
+
+  return { id: STATIC_USER_ID, email: configured.email };
 }
 
 export async function verifyCredentials(email: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return null;
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return null;
-  return { id: user.id, email: user.email };
-}
-
-export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 10);
+  const configured = getConfiguredLogin();
+  if (email.trim().toLowerCase() !== configured.email) return null;
+  if (password !== configured.password) return null;
+  return { id: STATIC_USER_ID, email: configured.email };
 }

@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
+import { getConfiguredLogin, getSession } from "@/lib/auth";
 import LoginForm from "./LoginForm";
 
 export default async function LoginPage() {
   const session = await getSession();
   if (session) redirect("/");
+
+  const login = getConfiguredLogin();
 
   return (
     <main className="flex min-h-screen items-center justify-center p-4">
@@ -37,7 +39,7 @@ export default async function LoginPage() {
         </div>
 
         <p className="mt-4 text-center text-xs text-slate-400">
-          حساب تجريبي: test@test.com / test1234
+          الحساب الحالي: {login.email} / {login.password}
         </p>
       </div>
     </main>

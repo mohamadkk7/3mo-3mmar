@@ -14,15 +14,15 @@
 
 ## التقنيات
 - Next.js (App Router) + TypeScript + Tailwind CSS — واجهة عربية حديثة متجاوبة مع الموبايل (RTL).
-- Prisma + PostgreSQL — مناسب لـ Vercel عبر Vercel Postgres أو Neon أو Supabase.
-- جلسات دخول موقّعة (JWT في كوكي httpOnly) + bcrypt لكلمات السر.
+- جلسات دخول موقّعة (JWT في كوكي httpOnly).
+- تخزين بسيط بدون قاعدة بيانات:
+	- محلياً: ملف JSON في `data/store.json`
+	- على Vercel: ملف JSON داخل `Vercel Blob`
 
 ## التشغيل
 
 ```powershell
 npm install
-npm run db:push      # إنشاء الجداول على PostgreSQL
-npm run db:seed      # إنشاء الحساب الثابت
 npm run dev          # http://localhost:3000
 ```
 
@@ -34,30 +34,25 @@ npm start
 ```
 
 ## الحساب الثابت
-يُنشأ من ملف `.env` (`SEED_EMAIL` / `SEED_PASSWORD`). الافتراضي:
+يُقرأ مباشرة من ملف `.env` (`SEED_EMAIL` / `SEED_PASSWORD`). الافتراضي:
 
 - البريد: `test@test.com`
 - كلمة السر: `test1234`
 
-غيّرها في `.env` ثم أعد `npm run db:seed` (لحساب جديد) — وغيّر `AUTH_SECRET` لقيمة عشوائية طويلة.
+غيّرها في `.env` فقط، وغيّر `AUTH_SECRET` لقيمة عشوائية طويلة.
 
 ## Vercel
 - لا ترفع ملف `.env` إلى GitHub.
 - أضف القيم نفسها داخل إعدادات Vercel في `Environment Variables`.
-- المطلوب في Vercel على الأقل:
-	- `DATABASE_URL`
-	- `AUTH_SECRET`
-	- `SEED_EMAIL`
-	- `SEED_PASSWORD`
-- قبل أول تشغيل فعلي، اربط قاعدة PostgreSQL ثم نفّذ مرة واحدة:
-
-```powershell
-npm run db:push
-npm run db:seed
-```
-
-- بعد ذلك اربط المشروع مع Vercel مباشرة من GitHub.
+- للحفظ الدائم بدون قاعدة بيانات، أنشئ `Blob Store` من داخل مشروع Vercel ثم اربطه بالمشروع.
+- عند الربط، سيضيف Vercel متغيرات Blob اللازمة تلقائياً للمشروع.
+- المتغيرات التي تضبطها أنت يدوياً:
+  - `AUTH_SECRET`
+  - `SEED_EMAIL`
+  - `SEED_PASSWORD`
+- بعد ربط Blob، سيحفظ التطبيق المواد والمنتجات تلقائياً على Vercel.
 
 ## ملاحظات
 - العملة بالدولار `$`، والكميات تدعم الكسور (مثل `1.25`).
 - لا تحفظ الأسرار داخل GitHub؛ استخدم `.env` محلياً و`Environment Variables` داخل Vercel.
+- إذا لم تربط Blob على Vercel، فلن يكون التخزين دائماً هناك.

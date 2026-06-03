@@ -2,8 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  createProduct as createStoredProduct,
+  deleteProduct as deleteStoredProduct,
+  getProductById,
+  listMaterials,
+  updateProduct as updateStoredProduct,
+} from "@/lib/store";
 
 async function requireUser() {
   const user = await getCurrentUser();
@@ -20,7 +26,7 @@ export async function createProduct(input: {
   outputQuantity: number;
   ingredients: IngredientInput[];
 }): Promise<ActionResult> {
-  const user = await requireUser();
+  await requireUser();
 
   const name = input.name.trim();
   if (!name) return { ok: false, error: "اسم المنتج مطلوب." };
@@ -31,29 +37,21 @@ export async function createProduct(input: {
     (i) => i.materialId && isFinite(i.quantity) && i.quantity > 0
   );
 
-  // التأكد أن كل المواد تخص المستخدم
   if (cleaned.length > 0) {
+    const materials = await listMaterials();
     const ids = cleaned.map((i) => i.materialId);
-    const count = await prisma.material.count({
-      where: { id: { in: ids }, userId: user.id },
-    });
-    if (count !== new Set(ids).size)
+    const validIds = new Set(materials.map((material) => material.id));
+    if (!ids.every((id) => validIds.has(id))) {
       return { ok: false, error: "بعض المواد غير صالحة." };
+    }
   }
 
-  const product = await prisma.product.create({
-    data: {
-      userId: user.id,
-      name,
-      outputQuantity: input.outputQuantity,
-      ingredients: {
-        create: cleaned.map((i) => ({
-          materialId: i.materialId,
-          quantity: i.quantity,
-        })),
-      },
-    },
+  const product = await createStoredProduct({
+    name,
+    outputQuantity: input.outputQuantity,
+    ingredients: cleaned,
   });
+  if (!product) return { ok: false, error: "بعض المواد غير صالحة." };
 
   revalidatePath("/products");
   revalidatePath("/");
@@ -68,12 +66,9 @@ export async function updateProduct(
     ingredients: IngredientInput[];
   }
 ): Promise<ActionResult> {
-  const user = await requireUser();
+  await requireUser();
 
-  const existing = await prisma.product.findFirst({
-    where: { id, userId: user.id },
-    select: { id: true },
-  });
+  const existing = await getProductById(id);
   if (!existing) return { ok: false, error: "المنتج غير موجود." };
 
   const name = input.name.trim();
@@ -86,31 +81,19 @@ export async function updateProduct(
   );
 
   if (cleaned.length > 0) {
+    const materials = await listMaterials();
     const ids = cleaned.map((i) => i.materialId);
-    const count = await prisma.material.count({
-      where: { id: { in: ids }, userId: user.id },
-    });
-    if (count !== new Set(ids).size)
+    const validIds = new Set(materials.map((material) => material.id));
+    if (!ids.every((materialId) => validIds.has(materialId))) {
       return { ok: false, error: "بعض المواد غير صالحة." };
+    }
   }
 
-  // استبدال المكونات بالكامل ضمن معاملة
-  await prisma.$transaction([
-    prisma.ingredient.deleteMany({ where: { productId: id } }),
-    prisma.product.update({
-      where: { id },
-      data: {
-        name,
-        outputQuantity: input.outputQuantity,
-        ingredients: {
-          create: cleaned.map((i) => ({
-            materialId: i.materialId,
-            quantity: i.quantity,
-          })),
-        },
-      },
-    }),
-  ]);
+  await updateStoredProduct(id, {
+    name,
+    outputQuantity: input.outputQuantity,
+    ingredients: cleaned,
+  });
 
   revalidatePath("/products");
   revalidatePath(`/products/${id}`);
@@ -119,14 +102,9 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(id: string): Promise<ActionResult> {
-  const user = await requireUser();
-  const existing = await prisma.product.findFirst({
-    where: { id, userId: user.id },
-    select: { id: true },
-  });
-  if (!existing) return { ok: false, error: "المنتج غير موجود." };
-
-  await prisma.product.delete({ where: { id } });
+  await requireUser();
+  const deleted = await deleteStoredProduct(id);
+  if (!deleted) return { ok: false, error: "المنتج غير موجود." };
 
   revalidatePath("/products");
   revalidatePath("/");

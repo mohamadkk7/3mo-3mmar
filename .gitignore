@@ -8,9 +8,9 @@ npm-debug.log*
 .env
 .env*.local
 
-# Prisma local database
-prisma/dev.db
-prisma/dev.db-journal
+# Local JSON storage for development
+data/store.json
+
 *.db
 *.db-journal
 
