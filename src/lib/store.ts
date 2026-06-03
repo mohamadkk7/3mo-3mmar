@@ -133,7 +133,10 @@ async function writeLocalStore(store: AppStore): Promise<void> {
 
 async function readBlobStore(): Promise<AppStore> {
   try {
-    const blob = await get(getBlobReadTarget(), { access: "private" });
+    const blob = await get(getBlobReadTarget(), {
+      access: "private",
+      useCache: false,
+    });
     if (!blob || blob.statusCode !== 200 || !blob.stream) {
       return createDefaultStore();
     }
