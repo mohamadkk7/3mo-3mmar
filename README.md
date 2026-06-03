@@ -14,14 +14,14 @@
 
 ## التقنيات
 - Next.js (App Router) + TypeScript + Tailwind CSS — واجهة عربية حديثة متجاوبة مع الموبايل (RTL).
-- Prisma + SQLite — تخزين بسيط على الخادم.
+- Prisma + PostgreSQL — مناسب لـ Vercel عبر Vercel Postgres أو Neon أو Supabase.
 - جلسات دخول موقّعة (JWT في كوكي httpOnly) + bcrypt لكلمات السر.
 
 ## التشغيل
 
 ```powershell
 npm install
-npm run db:push      # إنشاء قاعدة البيانات
+npm run db:push      # إنشاء الجداول على PostgreSQL
 npm run db:seed      # إنشاء الحساب الثابت
 npm run dev          # http://localhost:3000
 ```
@@ -41,6 +41,23 @@ npm start
 
 غيّرها في `.env` ثم أعد `npm run db:seed` (لحساب جديد) — وغيّر `AUTH_SECRET` لقيمة عشوائية طويلة.
 
+## Vercel
+- لا ترفع ملف `.env` إلى GitHub.
+- أضف القيم نفسها داخل إعدادات Vercel في `Environment Variables`.
+- المطلوب في Vercel على الأقل:
+	- `DATABASE_URL`
+	- `AUTH_SECRET`
+	- `SEED_EMAIL`
+	- `SEED_PASSWORD`
+- قبل أول تشغيل فعلي، اربط قاعدة PostgreSQL ثم نفّذ مرة واحدة:
+
+```powershell
+npm run db:push
+npm run db:seed
+```
+
+- بعد ذلك اربط المشروع مع Vercel مباشرة من GitHub.
+
 ## ملاحظات
 - العملة بالدولار `$`، والكميات تدعم الكسور (مثل `1.25`).
-- قاعدة البيانات `prisma/dev.db` غير مرفوعة في Git (محلية على الخادم).
+- لا تحفظ الأسرار داخل GitHub؛ استخدم `.env` محلياً و`Environment Variables` داخل Vercel.
