@@ -49,6 +49,13 @@ export type ExpandedProduct = Omit<StoredProduct, "ingredients"> & {
 const STORE_PATHNAME = "factory-data/store.json";
 const LOCAL_STORE_PATH = path.join(process.cwd(), "data", "store.json");
 
+export class StorePersistenceError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "StorePersistenceError";
+  }
+}
+
 function createDefaultStore(): AppStore {
   return {
     version: 1,
@@ -57,11 +64,12 @@ function createDefaultStore(): AppStore {
   };
 }
 
+function isVercelRuntime(): boolean {
+  return Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
+}
+
 function hasBlobStorage(): boolean {
-  return Boolean(
-    process.env.BLOB_READ_WRITE_TOKEN ||
-      (process.env.BLOB_STORE_ID && process.env.VERCEL_OIDC_TOKEN)
-  );
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
 }
 
 function normalizeStore(input: unknown): AppStore {
@@ -112,12 +120,19 @@ async function readBlobStore(): Promise<AppStore> {
 }
 
 async function writeBlobStore(store: AppStore): Promise<void> {
-  await put(STORE_PATHNAME, JSON.stringify(store), {
-    access: "private",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType: "application/json",
-  });
+  try {
+    await put(STORE_PATHNAME, JSON.stringify(store), {
+      access: "private",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType: "application/json",
+    });
+  } catch (error) {
+    throw new StorePersistenceError(
+      "تعذر حفظ البيانات في تخزين Vercel Blob. تحقق من إعدادات التخزين في Vercel.",
+      { cause: error }
+    );
+  }
 }
 
 async function readStore(): Promise<AppStore> {
@@ -129,6 +144,13 @@ async function writeStore(store: AppStore): Promise<void> {
     await writeBlobStore(store);
     return;
   }
+
+  if (isVercelRuntime()) {
+    throw new StorePersistenceError(
+      "التخزين غير مهيأ على Vercel. اربط Vercel Blob أو أضف BLOB_READ_WRITE_TOKEN أو BLOB_STORE_ID."
+    );
+  }
+
   await writeLocalStore(store);
 }
 

@@ -7,6 +7,7 @@ import {
   createMaterial as createStoredMaterial,
   deleteMaterial as deleteStoredMaterial,
   listMaterialsWithUsage,
+  StorePersistenceError,
   updateMaterial as updateStoredMaterial,
 } from "@/lib/store";
 
@@ -17,6 +18,15 @@ async function requireUser() {
 }
 
 export type ActionResult = { ok: boolean; error?: string };
+
+function getActionError(error: unknown): ActionResult {
+  if (error instanceof StorePersistenceError) {
+    return { ok: false, error: error.message };
+  }
+
+  console.error(error);
+  return { ok: false, error: "حدث خطأ غير متوقع أثناء حفظ البيانات." };
+}
 
 export async function createMaterial(formData: FormData): Promise<ActionResult> {
   await requireUser();
@@ -31,7 +41,11 @@ export async function createMaterial(formData: FormData): Promise<ActionResult> 
   if (!isFinite(price) || price < 0)
     return { ok: false, error: "السعر غير صالح." };
 
-  await createStoredMaterial({ name, unit, pricePerUnit: price });
+  try {
+    await createStoredMaterial({ name, unit, pricePerUnit: price });
+  } catch (error) {
+    return getActionError(error);
+  }
 
   revalidatePath("/materials");
   revalidatePath("/products");
@@ -47,7 +61,13 @@ export async function updateMaterialPrice(
   if (!isFinite(price) || price < 0)
     return { ok: false, error: "السعر غير صالح." };
 
-  const material = await updateStoredMaterial(id, { pricePerUnit: price });
+  let material;
+  try {
+    material = await updateStoredMaterial(id, { pricePerUnit: price });
+  } catch (error) {
+    return getActionError(error);
+  }
+
   if (!material) return { ok: false, error: "المادة غير موجودة." };
 
   revalidatePath("/materials");
@@ -79,7 +99,13 @@ export async function updateMaterial(
     patch.pricePerUnit = data.price;
   }
 
-  const material = await updateStoredMaterial(id, patch);
+  let material;
+  try {
+    material = await updateStoredMaterial(id, patch);
+  } catch (error) {
+    return getActionError(error);
+  }
+
   if (!material) return { ok: false, error: "المادة غير موجودة." };
 
   revalidatePath("/materials");
@@ -99,7 +125,11 @@ export async function deleteMaterial(id: string): Promise<ActionResult> {
       error: "لا يمكن حذف مادة مستخدمة في منتجات. احذفها من المنتجات أولاً.",
     };
 
-  await deleteStoredMaterial(id);
+  try {
+    await deleteStoredMaterial(id);
+  } catch (error) {
+    return getActionError(error);
+  }
 
   revalidatePath("/materials");
   revalidatePath("/products");

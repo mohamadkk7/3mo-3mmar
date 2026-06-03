@@ -8,6 +8,7 @@ import {
   deleteProduct as deleteStoredProduct,
   getProductById,
   listMaterials,
+  StorePersistenceError,
   updateProduct as updateStoredProduct,
 } from "@/lib/store";
 
@@ -20,6 +21,15 @@ async function requireUser() {
 export type ActionResult = { ok: boolean; error?: string; id?: string };
 
 type IngredientInput = { materialId: string; quantity: number };
+
+function getActionError(error: unknown): ActionResult {
+  if (error instanceof StorePersistenceError) {
+    return { ok: false, error: error.message };
+  }
+
+  console.error(error);
+  return { ok: false, error: "حدث خطأ غير متوقع أثناء حفظ البيانات." };
+}
 
 export async function createProduct(input: {
   name: string;
@@ -46,11 +56,17 @@ export async function createProduct(input: {
     }
   }
 
-  const product = await createStoredProduct({
-    name,
-    outputQuantity: input.outputQuantity,
-    ingredients: cleaned,
-  });
+  let product;
+  try {
+    product = await createStoredProduct({
+      name,
+      outputQuantity: input.outputQuantity,
+      ingredients: cleaned,
+    });
+  } catch (error) {
+    return getActionError(error);
+  }
+
   if (!product) return { ok: false, error: "بعض المواد غير صالحة." };
 
   revalidatePath("/products");
@@ -89,11 +105,15 @@ export async function updateProduct(
     }
   }
 
-  await updateStoredProduct(id, {
-    name,
-    outputQuantity: input.outputQuantity,
-    ingredients: cleaned,
-  });
+  try {
+    await updateStoredProduct(id, {
+      name,
+      outputQuantity: input.outputQuantity,
+      ingredients: cleaned,
+    });
+  } catch (error) {
+    return getActionError(error);
+  }
 
   revalidatePath("/products");
   revalidatePath(`/products/${id}`);
@@ -103,7 +123,14 @@ export async function updateProduct(
 
 export async function deleteProduct(id: string): Promise<ActionResult> {
   await requireUser();
-  const deleted = await deleteStoredProduct(id);
+
+  let deleted;
+  try {
+    deleted = await deleteStoredProduct(id);
+  } catch (error) {
+    return getActionError(error);
+  }
+
   if (!deleted) return { ok: false, error: "المنتج غير موجود." };
 
   revalidatePath("/products");
