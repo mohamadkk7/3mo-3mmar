@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  createdAt    DateTime   @default(now())
+  materials    Material[]
+  products     Product[]
+}
+
+model Material {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  unit        String       @default("kg") // "kg" or "l"
+  pricePerUnit Float       @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  ingredients Ingredient[]
+
+  @@index([userId])
+}
+
+model Product {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  outputQuantity Float        @default(1) // quantity produced (kg)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  ingredients    Ingredient[]
+
+  @@index([userId])
+}
+
+model Ingredient {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  quantity   Float    @default(0)
+
+  @@index([productId])
+  @@index([materialId])
+}
