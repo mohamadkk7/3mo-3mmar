@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
-import { get, put } from "@vercel/blob";
+import { BlobError, get, put } from "@vercel/blob";
 
 export type Unit = "kg" | "l";
 
@@ -95,13 +95,20 @@ async function writeLocalStore(store: AppStore): Promise<void> {
 }
 
 async function readBlobStore(): Promise<AppStore> {
-  const blob = await get(STORE_PATHNAME, { access: "private" });
-  if (!blob || blob.statusCode !== 200 || !blob.stream) {
-    return createDefaultStore();
-  }
+  try {
+    const blob = await get(STORE_PATHNAME, { access: "private" });
+    if (!blob || blob.statusCode !== 200 || !blob.stream) {
+      return createDefaultStore();
+    }
 
-  const raw = await new Response(blob.stream).text();
-  return normalizeStore(JSON.parse(raw));
+    const raw = await new Response(blob.stream).text();
+    return normalizeStore(JSON.parse(raw));
+  } catch (error) {
+    if (error instanceof BlobError) {
+      return createDefaultStore();
+    }
+    throw error;
+  }
 }
 
 async function writeBlobStore(store: AppStore): Promise<void> {
