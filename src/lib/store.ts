@@ -68,8 +68,37 @@ function isVercelRuntime(): boolean {
   return Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
 }
 
+function normalizeBlobStoreId(storeId: string): string {
+  return storeId.startsWith("store_") ? storeId.slice("store_".length) : storeId;
+}
+
+function getBlobStoreId(): string | null {
+  const envStoreId = process.env.BLOB_STORE_ID?.trim();
+  if (envStoreId) {
+    return normalizeBlobStoreId(envStoreId);
+  }
+
+  const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+  if (!token) {
+    return null;
+  }
+
+  const [, , , storeId = ""] = token.split("_");
+  return storeId ? normalizeBlobStoreId(storeId) : null;
+}
+
 function hasBlobStorage(): boolean {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
+}
+
+function getBlobReadTarget(): string {
+  const storeId = getBlobStoreId();
+  if (!storeId) {
+    return STORE_PATHNAME;
+  }
+
+  const cacheBust = `ts=${Date.now()}`;
+  return `https://${storeId}.private.blob.vercel-storage.com/${STORE_PATHNAME}?${cacheBust}`;
 }
 
 function normalizeStore(input: unknown): AppStore {
@@ -104,7 +133,7 @@ async function writeLocalStore(store: AppStore): Promise<void> {
 
 async function readBlobStore(): Promise<AppStore> {
   try {
-    const blob = await get(STORE_PATHNAME, { access: "private" });
+    const blob = await get(getBlobReadTarget(), { access: "private" });
     if (!blob || blob.statusCode !== 200 || !blob.stream) {
       return createDefaultStore();
     }
