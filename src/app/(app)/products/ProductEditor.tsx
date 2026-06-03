@@ -112,7 +112,13 @@ export default function ProductEditor({
         setError(res.error ?? "حدث خطأ");
         return;
       }
-      router.push(`/products/${res.id ?? initial?.id}`);
+
+      if (initial) {
+        router.push(`/products/${res.id ?? initial.id}`);
+      } else {
+        router.push("/products");
+      }
+
       router.refresh();
     });
   }
