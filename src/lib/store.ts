@@ -147,7 +147,7 @@ async function writeStore(store: AppStore): Promise<void> {
 
   if (isVercelRuntime()) {
     throw new StorePersistenceError(
-      "التخزين غير مهيأ على Vercel. اربط Vercel Blob أو أضف BLOB_READ_WRITE_TOKEN أو BLOB_STORE_ID."
+      "التخزين غير مهيأ على Vercel. من لوحة Vercel افتح Storage ثم أنشئ Blob واربطه بالمشروع، وبعدها أعد النشر. أو أضف BLOB_READ_WRITE_TOKEN أو BLOB_STORE_ID في Environment Variables."
     );
   }
 
